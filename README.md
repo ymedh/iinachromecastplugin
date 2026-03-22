@@ -2,24 +2,27 @@
 
 Cast videos playing in [IINA](https://iina.io) to any Chromecast device on your local network.
 
+Uses native macOS mDNS discovery (dns-sd) and the Google Cast protocol directly — no Chrome browser or Cast SDK required.
+
 ## Installation
 
-In IINA, go to **Plugins → Plugin Manager → Install from GitHub** and enter:
+In IINA: **Plugins → Plugin Manager → Install from GitHub**
 ```
 ymedh/iinachromecastplugin
 ```
 
 ## Features
-- 📡 Discover and connect to Chromecast devices from IINA's sidebar
-- ▶️ Automatically casts the current video when connected
-- ⏸ Syncs pause, resume, and seek from IINA → Chromecast
-- 🖥 Shows a casting overlay in IINA while active
+- 📡 Discovers Chromecast devices via mDNS on your local network
+- ▶️ Casts current video automatically when connected
+- ⏸ Syncs pause, resume, and seek from IINA to Chromecast
+- 🖥 Shows casting overlay in IINA while active
 - ⏹ Stop casting from sidebar or Plugins menu
 
 ## Requirements
 - IINA 1.3.0+
-- macOS with a Chromecast on the same Wi-Fi
-- Video must be a URL (local file:// paths won't reach Chromecast)
+- macOS (dns-sd is built in — no install needed)
+- Chromecast on the same Wi-Fi network
+- Video must be a reachable URL (local file:// paths won't reach Chromecast)
 
 ## License
 MIT
