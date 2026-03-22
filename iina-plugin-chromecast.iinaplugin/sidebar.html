@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Chromecast</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif; background: #1a1a1a; color: #f0f0f0; padding: 16px; }
+    h2 { font-size: 15px; font-weight: 600; margin-bottom: 12px; color: #fff; }
+    #status { font-size: 12px; color: #aaa; margin-bottom: 14px; }
+    #status.connected { color: #4CAF50; }
+    #status.error { color: #f44336; }
+    #scan-btn { width: 100%; padding: 9px; background: #E53935; color: white; border: none; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; margin-bottom: 14px; }
+    #scan-btn:hover { background: #C62828; }
+    #scan-btn:disabled { background: #555; cursor: default; }
+    #devices { display: flex; flex-direction: column; gap: 8px; }
+    .device-btn { width: 100%; padding: 10px 12px; background: #2a2a2a; border: 1px solid #3a3a3a; border-radius: 8px; color: #eee; font-size: 13px; text-align: left; cursor: pointer; display: flex; align-items: center; gap: 10px; }
+    .device-btn:hover { background: #333; border-color: #E53935; }
+    .device-btn.active { border-color: #4CAF50; background: #1f2e1f; }
+    .device-btn .device-name { flex: 1; }
+    .device-btn .device-badge { font-size: 10px; background: #4CAF50; color: white; border-radius: 10px; padding: 2px 7px; }
+    #stop-btn { width: 100%; margin-top: 14px; padding: 9px; background: transparent; color: #aaa; border: 1px solid #444; border-radius: 8px; font-size: 13px; cursor: pointer; display: none; }
+    #stop-btn:hover { background: #2a2a2a; color: #fff; }
+    #now-playing { margin-top: 14px; padding: 10px 12px; background: #1f2e1f; border: 1px solid #2e4a2e; border-radius: 8px; font-size: 12px; color: #aaa; display: none; }
+    #now-playing strong { color: #fff; display: block; margin-bottom: 4px; }
+    .empty-state { text-align: center; color: #555; font-size: 12px; padding: 20px 0; }
+  </style>
+</head>
+<body>
+<h2>📡 Chromecast</h2>
+<div id="status">Press Scan to find devices.</div>
+<button id="scan-btn" onclick="scanDevices()">🔍 Scan for Devices</button>
+<div id="devices"><div class="empty-state">No devices found yet.</div></div>
+<button id="stop-btn" onclick="stopCasting()">⏹ Stop Casting</button>
+<div id="now-playing">
+  <strong id="np-title">Unknown</strong>
+  <span id="np-url" style="word-break:break-all;"></span>
+</div>
+<script src="https://www.gstatic.com/cv/js/sender/v1/cast_sender.js?loadCastFramework=1"></script>
+<script>
+  let castSession = null, connectedDevice = null, currentUrl = null, currentTitle = null;
+
+  window['__onGCastApiAvailable'] = function(isAvailable) {
+    if (!isAvailable) { setStatus('Chromecast SDK unavailable.', 'error'); return; }
+    cast.framework.CastContext.getInstance().setOptions({
+      receiverApplicationId: chrome.cast.media.DEFAULT_MEDIA_RECEIVER_APP_ID,
+      autoJoinPolicy: chrome.cast.AutoJoinPolicy.ORIGIN_SCOPED,
+    });
+    cast.framework.CastContext.getInstance().addEventListener(
+      cast.framework.CastContextEventType.SESSION_STATE_CHANGED, onSessionStateChanged
+    );
+    setStatus('SDK ready. Press Scan to find devices.');
+  };
+
+  function onSessionStateChanged(e) {
+    const s = e.sessionState;
+    if (s === cast.framework.SessionState.SESSION_STARTED || s === cast.framework.SessionState.SESSION_RESUMED) {
+      castSession = cast.framework.CastContext.getInstance().getCurrentSession();
+      connectedDevice = castSession.getCastDevice().friendlyName;
+      setStatus('Connected to ' + connectedDevice, 'connected');
+      showStopButton(true);
+      notifyPlayer(true);
+      if (currentUrl) castMedia(currentUrl, currentTitle);
+    } else if (s === cast.framework.SessionState.SESSION_ENDED) {
+      castSession = null; connectedDevice = null;
+      setStatus('Disconnected.');
+      showStopButton(false);
+      notifyPlayer(false);
+      document.getElementById('now-playing').style.display = 'none';
+    }
+  }
+
+  function scanDevices() {
+    const btn = document.getElementById('scan-btn');
+    btn.disabled = true; btn.textContent = '⏳ Scanning...';
+    setStatus('Scanning for Chromecast devices...');
+    setTimeout(() => { btn.disabled = false; btn.textContent = '🔍 Scan for Devices'; renderDevices(); }, 2500);
+  }
+
+  function renderDevices() {
+    const container = document.getElementById('devices');
+    container.innerHTML = '';
+    const btn = document.createElement('button');
+    btn.className = 'device-btn' + (connectedDevice ? ' active' : '');
+    btn.innerHTML = `<span>📺</span><span class="device-name">${connectedDevice || 'Select Chromecast device…'}</span>${connectedDevice ? '<span class="device-badge">Live</span>' : ''}`;
+    btn.onclick = () => { if (!connectedDevice) cast.framework.CastContext.getInstance().requestSession().catch(e => setStatus('Could not connect: ' + e.code, 'error')); };
+    container.appendChild(btn);
+    if (!connectedDevice) setStatus('Click to open device picker.');
+  }
+
+  function castMedia(url, title) {
+    if (!castSession) return;
+    const mediaInfo = new chrome.cast.media.MediaInfo(url, 'video/mp4');
+    mediaInfo.metadata = new chrome.cast.media.GenericMediaMetadata();
+    mediaInfo.metadata.title = title || 'IINA Video';
+    const request = new chrome.cast.media.LoadRequest(mediaInfo);
+    request.autoplay = true;
+    castSession.loadMedia(request).then(() => {
+      document.getElementById('np-title').textContent = title || url;
+      document.getElementById('np-url').textContent = url;
+      document.getElementById('now-playing').style.display = 'block';
+      setStatus('Casting: ' + (title || 'video'), 'connected');
+    }).catch(e => setStatus('Load failed: ' + e.code, 'error'));
+  }
+
+  function stopCasting() { if (castSession) castSession.endSession(true); }
+
+  iina.onMessage('newFile', (d) => { currentUrl = d.url; currentTitle = d.title; if (castSession) castMedia(currentUrl, currentTitle); });
+  iina.onMessage('playerPause', () => { const m = castSession && castSession.getMediaSession(); if (m) m.pause(null, null, null); });
+  iina.onMessage('playerResume', () => { const m = castSession && castSession.getMediaSession(); if (m) m.play(null, null, null); });
+  iina.onMessage('playerSeek', (d) => { const m = castSession && castSession.getMediaSession(); if (m) { const r = new chrome.cast.media.SeekRequest(); r.currentTime = d.position; m.seek(r, null, null); } });
+  iina.onMessage('stopCast', () => stopCasting());
+  iina.onMessage('requestDevices', () => renderDevices());
+
+  function setStatus(msg, type = '') { const el = document.getElementById('status'); el.textContent = msg; el.className = type; }
+  function showStopButton(show) { document.getElementById('stop-btn').style.display = show ? 'block' : 'none'; }
+  function notifyPlayer(connected) { iina.postMessage('castStatus', { connected, deviceName: connectedDevice }); }
+</script>
+</body>
+</html>

@@ -1,0 +1,18 @@
+{
+  "name": "Chromecast",
+  "identifier": "io.github.ymedh.iina-plugin-chromecast",
+  "version": "1.0.0",
+  "apiVersion": "1.1",
+  "minimumIINAVersion": "1.3.0",
+  "description": "Cast the current video from IINA to any Chromecast device on your local network.",
+  "author": {
+    "name": "ymedh",
+    "url": "https://github.com/ymedh"
+  },
+  "ghRepo": "ymedh/iinachromecastplugin",
+  "entry": "main.js",
+  "globalEntry": "global.js",
+  "sidebarHTML": "sidebar.html",
+  "permissions": ["network-request"],
+  "allowedDomains": ["*"]
+}
